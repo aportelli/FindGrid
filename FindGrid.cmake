@@ -23,7 +23,13 @@ if(Grid_FOUND)
   set(Grid_INCLUDE_DIRS ${Grid_INCLUDE_DIR})
 endif()
 
+# get Grid flags from grid-config
 if(Grid_FOUND)
+  execute_process(
+    COMMAND ${Grid_CONFIG} --cxx OUTPUT_VARIABLE Grid_CXX
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  separate_arguments(Grid_CXX UNIX_COMMAND "${Grid_CXX}")
   execute_process(
     COMMAND ${Grid_CONFIG} --cxxflags OUTPUT_VARIABLE Grid_CXXFLAGS 
     OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -41,14 +47,44 @@ if(Grid_FOUND)
   separate_arguments(Grid_LIBS UNIX_COMMAND "${Grid_LIBS}")
 endif()
 
+# sanitize flags
+if(Grid_FOUND)
+  if ("nvcc" IN_LIST Grid_CXX)
+    message(STATUS "Grid uses CUDA")
+    set(Grid_CUDA On)
+  endif()
+  if (Grid_CUDA)
+    list(REMOVE_ITEM Grid_LDFLAGS "-Xcompiler")
+    list(REMOVE_ITEM Grid_LDFLAGS "-cudart")
+    list(REMOVE_ITEM Grid_LDFLAGS "shared")
+    list(APPEND Grid_LIBS CUDA::cudart)
+    list(FIND Grid_CXXFLAGS "-ccbin" Grid_ccbin_index)
+    if (Grid_ccbin_index GREATER -1)
+      math(EXPR Grid_ccbin_index_p1 "${Grid_ccbin_index} + 1")
+      list(GET Grid_CXXFLAGS ${Grid_ccbin_index_p1} Grid_HOST_COMPILER)
+      list(REMOVE_AT Grid_CXXFLAGS ${Grid_ccbin_index} ${Grid_ccbin_index_p1})
+    endif()
+    find_package(CUDAToolkit REQUIRED)
+  endif()
+  list(FILTER Grid_CXXFLAGS EXCLUDE REGEX "-O[0-9]")
+  list(REMOVE_ITEM Grid_LIBS "-lGrid")
+endif()
+
+# define Grid target
 if(Grid_FOUND AND NOT TARGET Grid::Grid)
-  add_library(Grid::Grid UNKNOWN IMPORTED)
+  add_library(Grid::Grid STATIC IMPORTED)
   set_target_properties(Grid::Grid PROPERTIES
     IMPORTED_LOCATION "${Grid_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${Grid_INCLUDE_DIR}"
     INTERFACE_COMPILE_OPTIONS "${Grid_CXXFLAGS}"
-    INTERFACE_LINK_OPTIONS "${Grid_LDFLAGS};${Grid_LIBS}"
+    INTERFACE_LINK_LIBRARIES "${Grid_LIBS}"
+    INTERFACE_LINK_OPTIONS "${Grid_LDFLAGS}"
   )
+  if (Grid_CUDA)
+    set_target_properties(Grid::Grid PROPERTIES
+      CUDA_RUNTIME_LIBRARY Shared
+  )
+  endif()
 endif()
 
 mark_as_advanced(
@@ -58,4 +94,6 @@ mark_as_advanced(
   Grid_CXXFLAGS
   Grid_LDFLAGS
   Grid_LIBS
+  Grid_ccbin_index
+  Grid_ccbin_index_p1
 )
