@@ -36,6 +36,11 @@ if(Hadrons_FOUND)
     message(STATUS "Hadrons uses CUDA")
     set(Hadrons_CUDA On)
   endif()
+  if ("hipcc" IN_LIST Hadrons_CXX)
+    message(STATUS "Hadrons uses HIP")
+    set(Hadrons_HIP On)
+  endif()
+
   execute_process(
     COMMAND ${Hadrons_CONFIG} --cxxflags OUTPUT_VARIABLE Hadrons_CXXFLAGS 
     OUTPUT_STRIP_TRAILING_WHITESPACE
