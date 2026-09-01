@@ -32,10 +32,19 @@ if(Hadrons_FOUND)
       OUTPUT_STRIP_TRAILING_WHITESPACE
     )
   separate_arguments(Hadrons_CXX UNIX_COMMAND "${Hadrons_CXX}")
-  if ("nvcc" IN_LIST Hadrons_CXX)
-    message(STATUS "Hadrons uses CUDA")
-    set(Hadrons_CUDA On)
-  endif()
+  foreach(CXX_PATH IN LISTS Hadrons_CXX)
+    cmake_path(GET CXX_PATH FILENAME CXX_FILENAME)
+    if (CXX_FILENAME STREQUAL "nvcc")
+      message(STATUS "Hadrons uses CUDA")
+      set(Hadrons_CUDA On)
+      break()
+    elseif (CXX_FILENAME STREQUAL "hipcc") 
+      message(STATUS "Hadrons uses HIP")
+      set(Hadrons_HIP On)
+      break()
+    endif()
+  endforeach()
+
   execute_process(
     COMMAND ${Hadrons_CONFIG} --cxxflags OUTPUT_VARIABLE Hadrons_CXXFLAGS 
     OUTPUT_STRIP_TRAILING_WHITESPACE
